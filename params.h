@@ -1,7 +1,9 @@
 #ifndef PARAMS_H
 #define PARAMS_H
 
+
 #include "config.h"
+#include <cstdint>
 
 #define PQS_n 256
 
