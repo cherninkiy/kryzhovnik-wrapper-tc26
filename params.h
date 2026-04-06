@@ -3,7 +3,7 @@
 
 
 #include "config.h"
-#include <cstdint>
+#include <stdint.h>
 
 #define PQS_n 256
 
