@@ -31,7 +31,10 @@ int main() {
         uint8_t pk[KRYZHOVNIK_PUBLIC_KEY_BYTES] = {0};
         printf("Generating keypair ... ");
         tm = get_time();
-        kryzhovnik_generate_keys(sk, pk);
+        if (kryzhovnik_keygen(sk, sizeof(sk), pk, sizeof(pk)) != KRYZHOVNIK_OK) {
+            printf("Key generation failed\n");
+            return 1;
+        }
         printf("Ok\n");
         printf("Keypair is generated in %.6f sec.\n", get_time() - tm);
 
@@ -41,13 +44,19 @@ int main() {
         size_t sig_len = 0;
 
         tm = get_time();
-        kryzhovnik_sign(sk, pk, (const uint8_t*)msg, msg_len, sig, &sig_len);
+        if (kryzhovnik_sign(sk, sizeof(sk), pk, sizeof(pk),
+                            (const uint8_t*)msg, msg_len,
+                            sig, sizeof(sig), &sig_len) != KRYZHOVNIK_OK) {
+            printf("Signing failed\n");
+            return 1;
+        }
         printf("Signed Ok\n");
         printf("Signing is completed in %.6f sec.\n", get_time() - tm);
 
         tm = get_time();
-        int success = kryzhovnik_verify(pk, sig, (const uint8_t*)msg, msg_len);
-        if (success == 0) {
+        int success = kryzhovnik_verify(pk, sizeof(pk), sig, sig_len,
+                        (const uint8_t*)msg, msg_len);
+        if (success == KRYZHOVNIK_OK) {
             printf("Verify Ok\n");
         } else {
             printf("Verify fail\n");
@@ -64,17 +73,26 @@ int main() {
     for (int loop = 0; loop < NTESTS; ++loop) {
         uint8_t sk[KRYZHOVNIK_SECRET_KEY_BYTES] = {0};
         uint8_t pk[KRYZHOVNIK_PUBLIC_KEY_BYTES] = {0};
-        kryzhovnik_generate_keys(sk, pk);
+        if (kryzhovnik_keygen(sk, sizeof(sk), pk, sizeof(pk)) != KRYZHOVNIK_OK) {
+            printf("Key generation failed\n");
+            return 1;
+        }
 
         const char *msg = "My test message";
         size_t msg_len = strlen(msg);
         uint8_t sig[KRYZHOVNIK_SIGNATURE_BYTES] = {0};
         size_t sig_len = 0;
 
-        kryzhovnik_sign(sk, pk, (const uint8_t*)msg, msg_len, sig, &sig_len);
+        if (kryzhovnik_sign(sk, sizeof(sk), pk, sizeof(pk),
+                            (const uint8_t*)msg, msg_len,
+                            sig, sizeof(sig), &sig_len) != KRYZHOVNIK_OK) {
+            printf("Signing failed\n");
+            return 1;
+        }
 
-        int success = kryzhovnik_verify(pk, sig, (const uint8_t*)msg, msg_len);
-        if (success != 0) {
+        int success = kryzhovnik_verify(pk, sizeof(pk), sig, sig_len,
+                        (const uint8_t*)msg, msg_len);
+        if (success != KRYZHOVNIK_OK) {
             printf("Verify fail\n");
             return 1;
         }
@@ -127,19 +145,27 @@ int main() {
         tkeygen[i] = cpucycles_start();
         uint8_t sk[KRYZHOVNIK_SECRET_KEY_BYTES] = {0};
         uint8_t pk[KRYZHOVNIK_PUBLIC_KEY_BYTES] = {0};
-        kryzhovnik_generate_keys(sk, pk);
+        if (kryzhovnik_keygen(sk, sizeof(sk), pk, sizeof(pk)) != KRYZHOVNIK_OK) {
+            printf("Key generation failed\n");
+            return -1;
+        }
         tkeygen[i] = cpucycles_stop() - tkeygen[i] - timing_overhead;
 
         tsign[i] = cpucycles_start();
         uint8_t sig[KRYZHOVNIK_SIGNATURE_BYTES] = {0};
         size_t sig_len = 0;
-        kryzhovnik_sign(sk, pk, m, MLEN_TEST, sig, &sig_len);
+        if (kryzhovnik_sign(sk, sizeof(sk), pk, sizeof(pk),
+                            m, MLEN_TEST, sig, sizeof(sig),
+                            &sig_len) != KRYZHOVNIK_OK) {
+            printf("Signing failed\n");
+            return -1;
+        }
         tsign[i] = cpucycles_stop() - tsign[i] - timing_overhead;
 
         tverify[i] = cpucycles_start();
-        ret = kryzhovnik_verify(pk, sig, m, MLEN_TEST);
+        ret = kryzhovnik_verify(pk, sizeof(pk), sig, sig_len, m, MLEN_TEST);
         tverify[i] = cpucycles_stop() - tverify[i] - timing_overhead;
-        if (ret != 0) {
+        if (ret != KRYZHOVNIK_OK) {
             printf("Verification failed\n");
             return -1;
         }
