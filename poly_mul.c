@@ -3,15 +3,12 @@
 // --- This file has been adapted from SABER KEM implementation
 // ---------------------------------------
 
-#include <iostream>
-#include <cstring>
+#include <string.h>
 #include "poly_mul.h"
 
 #define N_RES (PQS_n << 1)
 #define N_SB (PQS_n >> 2)
 #define N_SB_RES (2*N_SB-1)
-
-using namespace NTL;
 
 /**
  * Polynomial multiplication using the schoolbook method, c[x] = a[x]*b[x] 
@@ -21,22 +18,22 @@ using namespace NTL;
  * 
 **/
 
-void print_polystruct(poly &a, int64_t n, uint64_t p){
+void print_polystruct(const poly *a, int64_t n, uint64_t p){
 
 	int i;
 	for (i = n - 1; i >= 0; i--){
-		if (a.coeffs[i] != 0){
+		if (a->coeffs[i] != 0){
 				if(i!=0){
 					#if DEBUG_OUTPUTMODE == 1
-					printf("  %u*x^%d + ", a.coeffs[i],i); // Output for SAGE
+					printf("  %u*x^%d + ", a->coeffs[i],i); // Output for SAGE
 					#elif DEBUG_OUTPUTMODE == 2
-					printf("  Mod(%d,%u)*x^%d + ", a.coeffs[i], p, i); // Output for PARIGP
+					printf("  Mod(%d,%u)*x^%d + ", a->coeffs[i], p, i); // Output for PARIGP
 					#endif
 				} else {
 					#if DEBUG_OUTPUTMODE == 1
-					printf("  %u*x^%d ", a.coeffs[i], i); // Outout for SAGE
+					printf("  %u*x^%d ", a->coeffs[i], i); // Outout for SAGE
 					#elif DEBUG_OUTPUTMODE == 2
-					printf("  Mod(%d,%u)*x^%d ", a.coeffs[i], p, i); // Outout for PARIGP
+					printf("  Mod(%d,%u)*x^%d ", a->coeffs[i], p, i); // Outout for PARIGP
 					#endif
 				}
 			}
@@ -53,7 +50,7 @@ void print_polystruct(poly &a, int64_t n, uint64_t p){
  * 
 **/
 
-void schoolbook_mul(poly &a, poly &b, poly &res, uint32_t n, uint32_t p) {
+void schoolbook_mul(const poly *a, const poly *b, poly *res, uint32_t n, uint32_t p) {
 	uint32_t i;
 	uint32_t j, mask = 2 * n;
 	//-------------------normal multiplication-----------------
@@ -63,7 +60,7 @@ void schoolbook_mul(poly &a, poly &b, poly &res, uint32_t n, uint32_t p) {
 	}
 	for (i = 0; i < n; i++) {
 		for (j = 0; j < n; j++) {
-			c[i + j] += (int64_t) (a.coeffs[i] * b.coeffs[j]);
+			c[i + j] += (int64_t) (a->coeffs[i] * b->coeffs[j]);
 		}
 	}
 	//---------------reduction-------
@@ -74,7 +71,7 @@ void schoolbook_mul(poly &a, poly &b, poly &res, uint32_t n, uint32_t p) {
 		if (t < 0) {
 			t += p;
 		}
-		res.coeffs[i - n] = t;
+		res->coeffs[i - n] = t;
 	}
 }
 
@@ -85,15 +82,15 @@ void schoolbook_mul(poly &a, poly &b, poly &res, uint32_t n, uint32_t p) {
  * 
 **/
 
-void cook_karatsuba_mul(poly &a_poly, poly &b_poly, poly &res, uint32_t n, uint32_t p){ 
+void cook_karatsuba_mul(const poly *a_poly, const poly *b_poly, poly *res, uint32_t n, uint32_t p){ 
 
 	uint32_t i;
 
 //-------------------normal multiplication-----------------
 
 	uint32_t c[512];
-	uint32_t *a = a_poly.coeffs;
-	uint32_t *b = b_poly.coeffs;
+	const uint32_t *a = a_poly->coeffs;
+	const uint32_t *b = b_poly->coeffs;
 
 	for (i = 0; i < 512; i++) c[i] = 0;
 
@@ -101,7 +98,7 @@ void cook_karatsuba_mul(poly &a_poly, poly &b_poly, poly &res, uint32_t n, uint3
 
 	//---------------reduction-------
 	for(i=n;i<2*n;i++){
-		res.coeffs[i-n]=(c[i-n]-c[i])&(p-1);
+		res->coeffs[i-n]=(c[i-n]-c[i])&(p-1);
 	}
 
 }

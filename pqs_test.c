@@ -1,5 +1,6 @@
-#include <iostream>
-#include <cstring>
+#include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
 #include "params.h"
 #include "poly_mul.h"
 #include "cpucycles.h"
@@ -7,7 +8,6 @@
 #include "sign.h"
 #define MSECS(t) ((double)(t)/(2600000))
 
-using namespace std;
 unsigned long long timing_overhead;
 
 #if TEST_MODE == 1
@@ -20,11 +20,11 @@ int main(){
 		vk_t vk; // Public key
 		sk_t sk; // Secret key
 		
-		cerr << "Generating keypair ... ";
+		printf("Generating keypair ... ");
 		tm = getCPUTime( );
-		PQS_keygen(vk, sk);
-		cerr << "Ok" << endl;
-		cerr << "Keypair is generated in " << getCPUTime() - tm << "sec." << endl;
+		PQS_keygen(&vk, &sk);
+		printf("Ok\n");
+		printf("Keypair is generated in %f sec.\n", getCPUTime() - tm);
 		
 		
 		// A message to be signed
@@ -33,20 +33,20 @@ int main(){
 		
 		signat_t sig; // Signature
 		tm = getCPUTime( );
-		PQS_sign(sig, &m[0], sizeof(m), sk, vk);
-		cerr << "Signed Ok" << endl;
-		cerr << "Signing is completed in " << getCPUTime() - tm << "sec." << endl;
+		PQS_sign(&sig, &m[0], sizeof(m), &sk, &vk);
+		printf("Signed Ok\n");
+		printf("Signing is completed in %f sec.\n", getCPUTime() - tm);
 		
 		
 		tm = getCPUTime( );
-		bool success = PQS_verify(sig, &m[0], sizeof(m), vk);
+		bool success = PQS_verify(&sig, &m[0], sizeof(m), &vk);
 		if(success){
-			cerr << "Verify Ok" << endl;
+			printf("Verify Ok\n");
 		} else {
-			cerr << "Verify fail" << endl;
+			printf("Verify fail\n");
 			return 0;
 		}
-		cerr << "Verification is completed in " << getCPUTime() - tm << "sec." << endl;
+		printf("Verification is completed in %f sec.\n", getCPUTime() - tm);
 	}
 	
 	return 0;
@@ -62,23 +62,23 @@ int main(){
 		vk_t vk; // Public key
 		sk_t sk; // Secret key
 		
-		PQS_keygen(vk, sk);
+		PQS_keygen(&vk, &sk);
 		
 		// A message to be signed
 		// ToDo: Add input from a file
 		unsigned char m[] = "My test message";
 		
 		signat_t sig; // Signature
-		PQS_sign(sig, &m[0], sizeof(m), sk, vk);
+		PQS_sign(&sig, &m[0], sizeof(m), &sk, &vk);
 		
-		bool success = PQS_verify(sig, &m[0], sizeof(m), vk);
+		bool success = PQS_verify(&sig, &m[0], sizeof(m), &vk);
 		if(!success){
-			cerr << "Verify fail" << endl;
+			printf("Verify fail\n");
 			return 0;
 		}
 
 		if(loop % 1000 == 0){
-			cerr << (loop / 1000) << "k tests ok in " << getCPUTime() - tm << endl;
+			printf("%dk tests ok in %f\n", loop / 1000, getCPUTime() - tm);
 			tm = getCPUTime( );
 		}
 	}
@@ -138,18 +138,18 @@ int main(){
 	timing_overhead = cpucycles_overhead();
 
 	for(i=0; i<NTESTS; ++i){
-		randombytes(m, MLEN_TEST);
+		kryzhovnik_randombytes(m, MLEN_TEST);
 		tkeygen[i] = cpucycles_start();
-		PQS_keygen(vk, sk);
+		PQS_keygen(&vk, &sk);
 		tkeygen[i] = cpucycles_stop() - tkeygen[i] - timing_overhead;
 		
 		tsign[i] = cpucycles_start();
-		PQS_sign(sig, &m[0], sizeof(m), sk, vk);
+		PQS_sign(&sig, &m[0], sizeof(m), &sk, &vk);
 		tsign[i] = cpucycles_stop() - tsign[i] - timing_overhead;
 		//printf("%llu \n", tsign[i]);
 		
 		tverify[i] = cpucycles_start();
-		ret = PQS_verify(sig, &m[0], sizeof(m), vk);
+		ret = PQS_verify(&sig, &m[0], sizeof(m), &vk);
 		tverify[i] = cpucycles_stop() - tverify[i] - timing_overhead;
 		
 		if(!ret) {

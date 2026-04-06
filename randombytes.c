@@ -34,7 +34,7 @@ static void randombytes_fallback(unsigned char *x, size_t xlen)
 }
 
 #ifdef SYS_getrandom
-void randombytes(unsigned char *buf, size_t buflen)
+void kryzhovnik_randombytes(unsigned char *buf, size_t buflen)
 {
   size_t d = 0;
   int r;
@@ -54,7 +54,7 @@ void randombytes(unsigned char *buf, size_t buflen)
   }
 }
 #else
-void randombytes(unsigned char *buf, size_t buflen)
+void kryzhovnik_randombytes(unsigned char *buf, size_t buflen)
 {
   randombytes_fallback(buf, buflen);
 }

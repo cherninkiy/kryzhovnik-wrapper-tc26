@@ -1,11 +1,9 @@
 
 # Minimum CMake version and project definition
 cmake_minimum_required(VERSION 3.10)
-project(kryzhovnik C CXX)
+project(kryzhovnik C)
 
-# Set C/C++ standards
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# Set C standard
 set(CMAKE_C_STANDARD 99)
 
 # Source files for the main kryzhovnik static library
@@ -26,19 +24,16 @@ target_include_directories(kryzhovnik PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Wrapper static library (depends on kryzhovnik)
 add_library(kryzhovnik_wrapper STATIC kryzhovnik_wrapper.c)
-set_source_files_properties(kryzhovnik_wrapper.c PROPERTIES LANGUAGE CXX)
 target_include_directories(kryzhovnik_wrapper PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(kryzhovnik_wrapper PRIVATE kryzhovnik)
 
 # Test executable for the wrapper API
 add_executable(test_wrapper test_wrapper.c)
-set_source_files_properties(test_wrapper.c PROPERTIES LANGUAGE CXX)
 target_link_libraries(test_wrapper PRIVATE kryzhovnik)
 target_include_directories(test_wrapper PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Test executable for the wrapper (full test modes)
 add_executable(test_pqs test_pqs.c)
-set_source_files_properties(test_pqs.c PROPERTIES LANGUAGE CXX)
 target_link_libraries(test_pqs PRIVATE kryzhovnik)
 target_include_directories(test_pqs PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -52,20 +47,6 @@ set(SOURCES
     rng.c
     sign.c
     speed.c
-)
-
-# Compile all .c files as C++ for compatibility
-set_source_files_properties(
-    cpucycles.c
-    fips202.c
-    getCPUTime.c
-    poly_mul.c
-    pqs_test.c
-    randombytes.c
-    rng.c
-    sign.c
-    speed.c
-    PROPERTIES LANGUAGE CXX
 )
 
 # Header files (for IDEs and clarity)
@@ -86,12 +67,10 @@ find_package(OpenSSL REQUIRED)
 
 # Reference implementation test target (uses all sources)
 add_executable(pqs_test pqs_test.c ${SOURCES})
-set_target_properties(pqs_test PROPERTIES LINKER_LANGUAGE CXX)
 target_link_libraries(pqs_test PRIVATE OpenSSL::Crypto)
 target_include_directories(pqs_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Performance test target
 add_executable(speed speed.c ${SOURCES})
-set_target_properties(speed PROPERTIES LINKER_LANGUAGE CXX)
 target_link_libraries(speed PRIVATE OpenSSL::Crypto)
 target_include_directories(speed PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

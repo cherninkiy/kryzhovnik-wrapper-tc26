@@ -138,9 +138,9 @@ AES256_ECB(unsigned char *key, unsigned char *ctr, unsigned char *buffer)
 }
 
 void
-randombytes_init(unsigned char *entropy_input,
-                 unsigned char *personalization_string,
-                 int security_strength)
+drbg_randombytes_init(unsigned char *entropy_input,
+                      unsigned char *personalization_string,
+                      int security_strength)
 {
     unsigned char   seed_material[48];
     
@@ -155,7 +155,7 @@ randombytes_init(unsigned char *entropy_input,
 }
 
 int
-randombytes(unsigned char *x, unsigned long long xlen)
+drbg_randombytes(unsigned char *x, unsigned long long xlen)
 {
     unsigned char   block[16];
     int             i = 0;

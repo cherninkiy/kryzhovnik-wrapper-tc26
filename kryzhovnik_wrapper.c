@@ -99,7 +99,7 @@ int kryzhovnik_keygen(uint8_t *sk, size_t sk_capacity,
 
     vk_t vk;
     sk_t s;
-    PQS_keygen(vk, s);
+    PQS_keygen(&vk, &s);
     unpack_vk(&vk, pk);
     unpack_sk(&s, sk);
     return KRYZHOVNIK_OK;
@@ -125,7 +125,7 @@ int kryzhovnik_sign(const uint8_t *sk, size_t sk_len,
 
     pack_sk(&s, sk);
     pack_vk(&vk, pk);
-    PQS_sign(signature, msg, (uint32_t)msg_len, s, vk);
+    PQS_sign(&signature, msg, (uint32_t)msg_len, &s, &vk);
     unpack_sig(&signature, sig);
     *sig_len = KRYZHOVNIK_SIGNATURE_BYTES;
     return KRYZHOVNIK_OK;
@@ -148,7 +148,7 @@ int kryzhovnik_verify(const uint8_t *pk, size_t pk_len,
     pack_vk(&vk, pk);
     pack_sig(&signature, sig);
 
-    return PQS_verify(signature, msg, (uint32_t)msg_len, vk)
+    return PQS_verify(&signature, msg, (uint32_t)msg_len, &vk)
                ? KRYZHOVNIK_OK
                : KRYZHOVNIK_VERIFY_FAIL;
 }

@@ -3,6 +3,6 @@
 
 #include <unistd.h>
 
-void randombytes(unsigned char *x, size_t xlen);
+void kryzhovnik_randombytes(unsigned char *x, size_t xlen);
 
 #endif
