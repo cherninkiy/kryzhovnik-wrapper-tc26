@@ -3,11 +3,12 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "params.h"
 
-// Actual sizes of key and signature structures (in bytes)
-#define KRYZHOVNIK_PUBLIC_KEY_BYTES   4128
-#define KRYZHOVNIK_SECRET_KEY_BYTES   3072
-#define KRYZHOVNIK_SIGNATURE_BYTES    4096
+#define KRYZHOVNIK_POLY_BYTES         ((size_t)PQS_n * sizeof(uint32_t))
+#define KRYZHOVNIK_PUBLIC_KEY_BYTES   ((size_t)SEEDBYTES + (size_t)PQS_k * KRYZHOVNIK_POLY_BYTES)
+#define KRYZHOVNIK_SECRET_KEY_BYTES   ((size_t)PQS_l * KRYZHOVNIK_POLY_BYTES)
+#define KRYZHOVNIK_SIGNATURE_BYTES    ((size_t)(1 + PQS_l) * KRYZHOVNIK_POLY_BYTES)
 
 typedef enum kryzhovnik_status {
     KRYZHOVNIK_OK = 0,

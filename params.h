@@ -5,22 +5,25 @@
 #include "config.h"
 #include <stdint.h>
 
+#if defined(__has_include)
+#if __has_include("current-params.h")
+#include "current-params.h"
+#else
+#define KRYZHOVNIK_PARAMSET_NAME "medium"
+#include "paramsets/params_medium.h"
+#endif
+#else
+#define KRYZHOVNIK_PARAMSET_NAME "medium"
+#include "paramsets/params_medium.h"
+#endif
+
 #define PQS_n 256
-
-#define PQS_k 4
-#define PQS_l 3
-
-#define PQS_mu 19
-#define PQS_nu 23
 #define PQS_p (1 << PQS_mu)
 #define PQS_q (1 << PQS_nu)
 
-#define PQS_s 4 // GenSecret_s() works with PQS_s <= 7
-#define PQS_d 3
-
-#define PQS_gamma 1048096 // GenSecret_y() works with PQS_gamma <= 1048576
-#define PQS_omega 60
-#define PQS_beta 240
+#ifndef PQS_s
+#error "PQS_s must be defined by selected kryzhovnik paramset"
+#endif
 
 #define CRHBYTES 48
 #define SEEDBYTES 32

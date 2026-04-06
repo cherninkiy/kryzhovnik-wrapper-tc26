@@ -3,6 +3,15 @@
 #include "params.h"
 #include "sign.h"
 
+#define KRYZHOVNIK_CT_ASSERT(name, cond) typedef char name[(cond) ? 1 : -1]
+
+KRYZHOVNIK_CT_ASSERT(kryzhovnik_sk_size_matches,
+    KRYZHOVNIK_SECRET_KEY_BYTES == ((size_t)PQS_l * (size_t)PQS_n * sizeof(uint32_t)));
+KRYZHOVNIK_CT_ASSERT(kryzhovnik_pk_size_matches,
+    KRYZHOVNIK_PUBLIC_KEY_BYTES == ((size_t)SEEDBYTES + (size_t)PQS_k * (size_t)PQS_n * sizeof(uint32_t)));
+KRYZHOVNIK_CT_ASSERT(kryzhovnik_sig_size_matches,
+    KRYZHOVNIK_SIGNATURE_BYTES == ((size_t)(1 + PQS_l) * (size_t)PQS_n * sizeof(uint32_t)));
+
 /*
  * The wrapper exposes a byte-oriented API around the original reference code,
  * which operates on nested C/C++ structures. Direct memcpy is unsafe here
