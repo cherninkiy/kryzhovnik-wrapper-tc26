@@ -87,37 +87,68 @@ static void unpack_sig(const signat_t *src, uint8_t *dst) {
 // -----------------------------------------------------------------------------
 // Wrapper API implementation
 
-void kryzhovnik_generate_keys(uint8_t *sk, uint8_t *pk) {
+int kryzhovnik_keygen(uint8_t *sk, size_t sk_capacity,
+                      uint8_t *pk, size_t pk_capacity) {
+    if (sk == NULL || pk == NULL) {
+        return KRYZHOVNIK_BAD_ARG;
+    }
+    if (sk_capacity < KRYZHOVNIK_SECRET_KEY_BYTES ||
+        pk_capacity < KRYZHOVNIK_PUBLIC_KEY_BYTES) {
+        return KRYZHOVNIK_BAD_ARG;
+    }
+
     vk_t vk;
     sk_t s;
     PQS_keygen(vk, s);
     unpack_vk(&vk, pk);
     unpack_sk(&s, sk);
+    return KRYZHOVNIK_OK;
 }
 
-void kryzhovnik_sign(const uint8_t *sk, const uint8_t *pk,
-                     const uint8_t *msg, size_t msg_len,
-                     uint8_t *sig, size_t *sig_len) {
+int kryzhovnik_sign(const uint8_t *sk, size_t sk_len,
+                    const uint8_t *pk, size_t pk_len,
+                    const uint8_t *msg, size_t msg_len,
+                    uint8_t *sig, size_t sig_capacity,
+                    size_t *sig_len) {
     sk_t s;
     vk_t vk;
     signat_t signature;
+
+    if (sk == NULL || pk == NULL || msg == NULL || sig == NULL || sig_len == NULL) {
+        return KRYZHOVNIK_BAD_ARG;
+    }
+    if (sk_len != KRYZHOVNIK_SECRET_KEY_BYTES ||
+        pk_len != KRYZHOVNIK_PUBLIC_KEY_BYTES ||
+        sig_capacity < KRYZHOVNIK_SIGNATURE_BYTES) {
+        return KRYZHOVNIK_BAD_ARG;
+    }
 
     pack_sk(&s, sk);
     pack_vk(&vk, pk);
     PQS_sign(signature, msg, (uint32_t)msg_len, s, vk);
     unpack_sig(&signature, sig);
-    if (sig_len) {
-        *sig_len = KRYZHOVNIK_SIGNATURE_BYTES;
-    }
+    *sig_len = KRYZHOVNIK_SIGNATURE_BYTES;
+    return KRYZHOVNIK_OK;
 }
 
-int kryzhovnik_verify(const uint8_t *pk, const uint8_t *sig,
+int kryzhovnik_verify(const uint8_t *pk, size_t pk_len,
+                      const uint8_t *sig, size_t sig_len,
                       const uint8_t *msg, size_t msg_len) {
     vk_t vk;
     signat_t signature;
 
+    if (pk == NULL || sig == NULL || msg == NULL) {
+        return KRYZHOVNIK_BAD_ARG;
+    }
+    if (pk_len != KRYZHOVNIK_PUBLIC_KEY_BYTES ||
+        sig_len != KRYZHOVNIK_SIGNATURE_BYTES) {
+        return KRYZHOVNIK_BAD_ARG;
+    }
+
     pack_vk(&vk, pk);
     pack_sig(&signature, sig);
 
-    return PQS_verify(signature, msg, (uint32_t)msg_len, vk) ? 0 : 1;
+    return PQS_verify(signature, msg, (uint32_t)msg_len, vk)
+               ? KRYZHOVNIK_OK
+               : KRYZHOVNIK_VERIFY_FAIL;
 }
