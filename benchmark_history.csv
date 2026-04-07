@@ -1,0 +1,7 @@
+timestamp,profile,branch,commit,paramset,iters,msg_len,keygen_med_us,keygen_avg_us,sign_med_us,sign_avg_us,verify_med_us,verify_avg_us,sign_ops_s,raw_log
+"2026-04-07T19:02:14Z","pure-c-local","pure-c-local","9b900c0","medium","1000","20","720.000","775.528","16054.000","23909.148","907.000","973.976","41.824995","benchmark_tools/raw_logs/pure-c-local_9b900c0_20260407T190147Z.log"
+"2026-04-07T19:02:40Z","pure-c-origin","pure-c-origin","9b900c0","medium","1000","20","718.000","762.324","14611.500","22327.803","904.000","953.174","44.787210","benchmark_tools/raw_logs/pure-c-origin_9b900c0_20260407T190215Z.log"
+"2026-04-07T19:05:35Z","pure-c-local","pure-c-local","9b900c0","medium","1000","20","718.000","787.123","16000.000","22006.661","904.000","994.245","45.440787","benchmark_tools/raw_logs/pure-c-local_9b900c0_20260407T190510Z.log"
+"2026-04-07T19:05:40Z","stdc++-local","stdc++-local","7ac29e4","medium","10","20","720.500","1021.200","49626.500","59654.600","928.000","929.100","16.763167","benchmark_tools/raw_logs/stdc++-local_7ac29e4_20260407T190537Z.log"
+"2026-04-07T19:06:07Z","pure-c-origin","pure-c-origin","9b900c0","medium","1000","20","733.000","842.857","16008.000","23421.898","904.000","1051.937","42.695088","benchmark_tools/raw_logs/pure-c-origin_9b900c0_20260407T190540Z.log"
+"2026-04-07T19:06:11Z","stdc++-origin","stdc++-origin","7ac29e4","medium","10","20","719.000","906.500","94644.000","93750.400","907.000","1576.700","10.666621","benchmark_tools/raw_logs/stdc++-origin_7ac29e4_20260407T190607Z.log"
