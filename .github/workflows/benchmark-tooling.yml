@@ -15,6 +15,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch benchmark refs
+        run: |
+          git fetch --no-tags origin pure-c stdc++
 
       - name: Install dependencies
         timeout-minutes: 8
@@ -41,6 +47,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch benchmark refs
+        run: |
+          git fetch --no-tags origin pure-c stdc++
 
       - name: Install dependencies
         timeout-minutes: 12
