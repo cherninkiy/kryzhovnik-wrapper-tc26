@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  pure-c-local-smoke:
+  pure-c-origin-smoke:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -16,9 +16,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake make jq python3
 
-      - name: Run pure-c local profile
+      - name: Run pure-c origin profile
         run: |
-          ./benchmark_tools/run_benchmark.sh --branch pure-c-local
+          ./benchmark_tools/run_benchmark.sh --branch pure-c-origin
 
       - name: Upload benchmark artifacts
         uses: actions/upload-artifact@v4
