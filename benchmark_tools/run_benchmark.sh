@@ -10,6 +10,7 @@ RAW_DIR="${ROOT_DIR}/benchmark_tools/raw_logs"
 STRICT_MODE=0
 KEEP_GOING=0
 CURRENT_WT_DIR=""
+BENCH_BUILD_CACHE_DIR="${BENCH_BUILD_CACHE_DIR:-}"
 
 mkdir -p "${RAW_DIR}"
 
@@ -217,7 +218,7 @@ run_profile_ref() {
     return 2
   fi
 
-  local wt_suffix ts wt_dir raw_file build_log commit_short
+  local wt_suffix ts wt_dir raw_file build_log commit_short profile_cache_dir
   ts="$(date -u +%Y%m%dT%H%M%SZ)"
   wt_suffix="$(safe_name "${profile_name}_${ref}_${ts}_$$")"
   wt_dir="${ROOT_DIR}/benchmark_tools/worktree_${wt_suffix}"
@@ -231,6 +232,16 @@ run_profile_ref() {
   raw_file="${RAW_DIR}/${profile_name}_${commit_short}_${ts}.log"
   build_log="${RAW_DIR}/${profile_name}_${commit_short}_${ts}.build.log"
 
+  profile_cache_dir=""
+  if [[ -n "${BENCH_BUILD_CACHE_DIR}" ]]; then
+    profile_cache_dir="${BENCH_BUILD_CACHE_DIR}/$(safe_name "${profile_name}")"
+    mkdir -p "${profile_cache_dir}"
+    if [[ -d "${profile_cache_dir}/build-bench" ]]; then
+      rm -rf "${wt_dir}/build-bench"
+      cp -a "${profile_cache_dir}/build-bench" "${wt_dir}/build-bench"
+    fi
+  fi
+
   local status=0
   set +e
   (
@@ -243,15 +254,21 @@ run_profile_ref() {
   status=$?
   set -e
 
-  cleanup_worktree
-
   if [[ ${status} -ne 0 ]]; then
+    cleanup_worktree
     echo "Profile ${profile_name} failed. Build/runtime log: ${build_log}" >&2
     if [[ -f "${build_log}" ]]; then
       tail -n 120 "${build_log}" >&2 || true
     fi
     return ${status}
   fi
+
+  if [[ -n "${profile_cache_dir}" && -d "${wt_dir}/build-bench" ]]; then
+    rm -rf "${profile_cache_dir}/build-bench"
+    cp -a "${wt_dir}/build-bench" "${profile_cache_dir}/build-bench"
+  fi
+
+  cleanup_worktree
 
   local result_line
   result_line="$(parse_result_line "${raw_file}")"

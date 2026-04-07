@@ -3,15 +3,37 @@ name: benchmark-tooling
 on:
   workflow_dispatch:
   pull_request:
+    paths:
+      - '.github/workflows/benchmark-tooling.yml'
+      - 'benchmark_tools/**'
+      - 'pure-c/**'
+      - 'stdc++/**'
+      - 'CMakeLists.txt'
+      - '*.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
 
 concurrency:
   group: benchmark-tooling-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  pure-c-origin-smoke:
+  benchmark-trusted:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: pure-c-origin
+            strict: false
+            needs_ntl: false
+          - profile: stdc++-origin
+            strict: true
+            needs_ntl: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,28 +44,77 @@ jobs:
         run: |
           git fetch --no-tags origin pure-c stdc++
 
-      - name: Install dependencies
+      - name: Cache apt packages
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: >-
+            cmake make jq python3 python3-pip gcc-12 g++-12
+            ${{ matrix.needs_ntl && 'libntl-dev' || '' }}
+          version: 2
+
+      - name: Install pinned dependencies
         timeout-minutes: 8
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends cmake make jq python3
+          sudo apt-get install -y --no-install-recommends \
+            cmake make jq python3 python3-pip gcc-12 g++-12
+          if [[ "${{ matrix.needs_ntl }}" == "true" ]]; then
+            sudo apt-get install -y --no-install-recommends libntl-dev
+          fi
 
-      - name: Run pure-c origin profile
+      - name: Cache build-bench
+        uses: actions/cache@v4
+        with:
+          path: .bench-cache/${{ matrix.profile }}
+          key: bench-build-${{ runner.os }}-${{ matrix.profile }}-${{ github.sha }}-${{ hashFiles('benchmark_tools/config.json') }}
+          restore-keys: |
+            bench-build-${{ runner.os }}-${{ matrix.profile }}-
+
+      - name: Run benchmark profile
+        env:
+          CC: gcc-12
+          CXX: g++-12
+          BENCH_BUILD_CACHE_DIR: ${{ github.workspace }}/.bench-cache
         run: |
-          ./benchmark_tools/run_benchmark.sh --branch pure-c-origin
+          if [[ "${{ matrix.strict }}" == "true" ]]; then
+            ./benchmark_tools/run_benchmark.sh --strict --branch ${{ matrix.profile }}
+          else
+            ./benchmark_tools/run_benchmark.sh --branch ${{ matrix.profile }}
+          fi
 
       - name: Upload benchmark artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pure-c-benchmark-artifacts
+          name: benchmark-artifacts-${{ matrix.profile }}
           path: |
             benchmark_history.csv
             benchmark_report.md
             benchmark_tools/raw_logs/
 
-  stdcpp-origin-strict:
+      - name: Comment on benchmark failure
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const profile = '${{ matrix.profile }}';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              `Benchmark failed for profile: **${profile}**.`,
+              '',
+              `Run logs: ${runUrl}`,
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+  benchmark-fork-smoke:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -54,12 +125,25 @@ jobs:
         run: |
           git fetch --no-tags origin pure-c stdc++
 
-      - name: Install dependencies
-        timeout-minutes: 12
+      - name: Install smoke dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends cmake make jq python3 g++ libntl-dev
+          sudo apt-get install -y --no-install-recommends cmake make jq python3 gcc-12 g++-12
 
-      - name: Run stdc++ origin profile in strict mode
+      - name: Run restricted smoke profile
+        env:
+          CC: gcc-12
+          CXX: g++-12
+          BENCH_BUILD_CACHE_DIR: ${{ github.workspace }}/.bench-cache
         run: |
-          ./benchmark_tools/run_benchmark.sh --strict --branch stdc++-origin
+          ./benchmark_tools/run_benchmark.sh --branch pure-c-origin
+
+      - name: Upload smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-fork-smoke-artifacts
+          path: |
+            benchmark_history.csv
+            benchmark_report.md
+            benchmark_tools/raw_logs/
