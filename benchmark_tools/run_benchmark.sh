@@ -8,7 +8,8 @@ HISTORY_FILE="${ROOT_DIR}/benchmark_history.csv"
 REPORT_FILE="${ROOT_DIR}/benchmark_report.md"
 RAW_DIR="${ROOT_DIR}/benchmark_tools/raw_logs"
 STRICT_MODE=0
-LAST_RUN_SKIPPED=0
+KEEP_GOING=0
+CURRENT_WT_DIR=""
 
 mkdir -p "${RAW_DIR}"
 
@@ -19,6 +20,7 @@ Usage:
   ./benchmark_tools/run_benchmark.sh --branch <profile_name>
   ./benchmark_tools/run_benchmark.sh --compare-commits <commit1> <commit2> [--profile <profile_name>]
   ./benchmark_tools/run_benchmark.sh --strict [other options]
+  ./benchmark_tools/run_benchmark.sh --keep-going [other options]
 USAGE
 }
 
@@ -39,8 +41,19 @@ init_history() {
   fi
 }
 
+cleanup_worktree() {
+  if [[ -n "${CURRENT_WT_DIR}" && -d "${CURRENT_WT_DIR}" ]]; then
+    git -C "${ROOT_DIR}" worktree remove --force "${CURRENT_WT_DIR}" >/dev/null 2>&1 || true
+    CURRENT_WT_DIR=""
+  fi
+}
+
+trap cleanup_worktree EXIT INT TERM
+
 csv_escape() {
   local val="$1"
+  val="${val//$'\r'/\\r}"
+  val="${val//$'\n'/\\n}"
   val="${val//\"/\"\"}"
   printf '"%s"' "${val}"
 }
@@ -61,6 +74,61 @@ extract_kv() {
 
 safe_name() {
   sed 's/[^a-zA-Z0-9._-]/_/g' <<<"$1"
+}
+
+check_ref_exists() {
+  local ref="$1"
+  if ! git -C "${ROOT_DIR}" rev-parse --verify "${ref}^{commit}" >/dev/null 2>&1; then
+    echo "Reference not found: ${ref}" >&2
+    return 1
+  fi
+}
+
+validate_profile_config() {
+  local profile_name="$1"
+  local cfg_json="$2"
+  local errors=()
+
+  if [[ "$(jq -r '.name // empty' <<<"${cfg_json}")" != "${profile_name}" ]]; then
+    errors+=("name mismatch")
+  fi
+  if [[ -z "$(jq -r '.ref // empty' <<<"${cfg_json}")" ]]; then
+    errors+=("missing ref")
+  fi
+  if ! jq -e '.configure | type == "array" and length > 0' <<<"${cfg_json}" >/dev/null; then
+    errors+=("configure must be a non-empty array")
+  fi
+  if ! jq -e '.build | type == "array" and length > 0' <<<"${cfg_json}" >/dev/null; then
+    errors+=("build must be a non-empty array")
+  fi
+  if ! jq -e '.benchmark_command | type == "array" and length > 0' <<<"${cfg_json}" >/dev/null; then
+    errors+=("benchmark_command must be a non-empty array")
+  fi
+  if [[ -z "$(jq -r '.paramset // empty' <<<"${cfg_json}")" ]]; then
+    errors+=("missing paramset")
+  fi
+  if [[ -z "$(jq -r '.msg_len // empty' <<<"${cfg_json}")" ]]; then
+    errors+=("missing msg_len")
+  fi
+
+  if [[ ${#errors[@]} -ne 0 ]]; then
+    echo "Invalid config for profile ${profile_name}: ${errors[*]}" >&2
+    return 1
+  fi
+}
+
+load_cmd_array() {
+  local field="$1"
+  local cfg_json="$2"
+  local __resultvar="$3"
+  local -n out_ref="${__resultvar}"
+  local arr=()
+  mapfile -t arr < <(jq -r --arg field "${field}" '.[$field][]' <<<"${cfg_json}")
+  if [[ ${#arr[@]} -eq 0 ]]; then
+    echo "Invalid profile config: ${field} command array is empty" >&2
+    return 1
+  fi
+  out_ref=("${arr[@]}")
 }
 
 check_requirements() {
@@ -162,7 +230,6 @@ run_profile_ref() {
   local profile_name="$1"
   local ref="$2"
   local branch_label="$3"
-  LAST_RUN_SKIPPED=0
 
   local cfg
   cfg="$(jq -r --arg name "${profile_name}" '.profiles[] | select(.name == $name)' "${CONFIG_FILE}")"
@@ -171,21 +238,22 @@ run_profile_ref() {
     return 1
   fi
 
-  local configure_cmd build_cmd bench_binary bench_args
-  configure_cmd="$(jq -r '.configure' <<<"${cfg}")"
-  build_cmd="$(jq -r '.build' <<<"${cfg}")"
-  bench_binary="$(jq -r '.benchmark_binary' <<<"${cfg}")"
-  bench_args="$(jq -r '.benchmark_args // ""' <<<"${cfg}")"
+  validate_profile_config "${profile_name}" "${cfg}" || return 1
+  check_ref_exists "${ref}" || return 1
+
+  local -a configure_cmd=() build_cmd=() bench_cmd=()
+  load_cmd_array configure "${cfg}" configure_cmd || return 1
+  load_cmd_array build "${cfg}" build_cmd || return 1
+  load_cmd_array benchmark_command "${cfg}" bench_cmd || return 1
 
   local declared_paramset
   declared_paramset="$(jq -r '.paramset // ""' <<<"${cfg}")"
-  if [[ "${declared_paramset}" == "large" ]] || grep -Eq -- '-DKRYZHOVNIK_PARAMSET=large\b' <<<"${configure_cmd}"; then
+  if [[ "${declared_paramset}" == "large" ]] || printf '%s\n' "${configure_cmd[@]}" | grep -Eq -- '-DKRYZHOVNIK_PARAMSET=large\b'; then
     echo "Profile ${profile_name}: paramset 'large' is intentionally excluded from standard benchmark scenarios because it is very resource-intensive on CI/dev VMs." >&2
     if [[ ${STRICT_MODE} -eq 1 ]]; then
       return 1
     fi
-    LAST_RUN_SKIPPED=1
-    return 0
+    return 2
   fi
 
   if ! check_requirements "${profile_name}" "${cfg}"; then
@@ -193,44 +261,48 @@ run_profile_ref() {
       echo "Profile ${profile_name} (${ref}): strict mode enabled, stopping due to missing dependencies." >&2
       return 1
     fi
-    LAST_RUN_SKIPPED=1
     echo "Skipping profile ${profile_name} (${ref}) due to missing dependencies."
-    return 0
+    return 2
   fi
 
-  local wt_suffix ts wt_dir raw_file commit_short
+  local wt_suffix ts wt_dir raw_file build_log commit_short
   ts="$(date -u +%Y%m%dT%H%M%SZ)"
   wt_suffix="$(safe_name "${profile_name}_${ref}_${ts}_$$")"
   wt_dir="${ROOT_DIR}/benchmark_tools/worktree_${wt_suffix}"
 
+  check_ref_exists "${ref}" || return 1
+
   git -C "${ROOT_DIR}" worktree add --detach "${wt_dir}" "${ref}" >/dev/null
+  CURRENT_WT_DIR="${wt_dir}"
+
   commit_short="$(git -C "${wt_dir}" rev-parse --short HEAD)"
   raw_file="${RAW_DIR}/${profile_name}_${commit_short}_${ts}.log"
+  build_log="${RAW_DIR}/${profile_name}_${commit_short}_${ts}.build.log"
 
   local status=0
   set +e
   (
     set -e
     cd "${wt_dir}"
-    eval "${configure_cmd}" >/dev/null
-    eval "${build_cmd}" >/dev/null
-    if [[ -n "${bench_args}" ]]; then
-      eval "./${bench_binary} ${bench_args}" >"${raw_file}"
-    else
-      "./${bench_binary}" >"${raw_file}"
-    fi
+    "${configure_cmd[@]}" >"${build_log}" 2>&1
+    "${build_cmd[@]}" >>"${build_log}" 2>&1
+    "${bench_cmd[@]}" >"${raw_file}" 2>>"${build_log}"
   )
   status=$?
   set -e
 
-  git -C "${ROOT_DIR}" worktree remove --force "${wt_dir}" >/dev/null || true
+  cleanup_worktree
 
   if [[ ${status} -ne 0 ]]; then
+    echo "Profile ${profile_name} failed. Build/runtime log: ${build_log}" >&2
+    if [[ -f "${build_log}" ]]; then
+      tail -n 120 "${build_log}" >&2 || true
+    fi
     return ${status}
   fi
 
   local result_line
-  result_line="$(parse_result_line "${raw_file}" "${cfg}" || true)"
+  result_line="$(parse_result_line "${raw_file}" "${cfg}")"
   if [[ -z "${result_line}" ]]; then
     echo "Cannot parse benchmark output for profile ${profile_name}." >&2
     return 1
@@ -275,36 +347,58 @@ run_profile_ref() {
 run_all_profiles() {
   local names
   names="$(jq -r '.profiles[].name' "${CONFIG_FILE}")"
-  local name ref
+  local name ref rc
+  local had_errors=0
   while IFS= read -r name; do
     ref="$(jq -r --arg n "${name}" '.profiles[] | select(.name == $n) | .ref' "${CONFIG_FILE}")"
+    set +e
     run_profile_ref "${name}" "${ref}" "${name}"
+    rc=$?
+    set -e
+
+    if [[ ${rc} -eq 0 || ${rc} -eq 2 ]]; then
+      continue
+    fi
+
+    had_errors=1
+    if [[ ${KEEP_GOING} -eq 0 ]]; then
+      return ${rc}
+    fi
   done <<<"${names}"
+
+  if [[ ${had_errors} -eq 1 ]]; then
+    return 1
+  fi
 }
 
 run_compare_commits() {
   local left="$1"
   local right="$2"
   local profile="$3"
-  local left_skipped=0
-  local right_skipped=0
+  local left_rc right_rc
 
-  if ! run_profile_ref "${profile}" "${left}" "commit:${left}"; then
+  set +e
+  run_profile_ref "${profile}" "${left}" "commit:${left}"
+  left_rc=$?
+  set -e
+  if [[ ${left_rc} -ne 0 && ${left_rc} -ne 2 ]]; then
     echo "Compare failed: could not benchmark left commit ${left} with profile ${profile}." >&2
     return 1
   fi
-  left_skipped=${LAST_RUN_SKIPPED}
 
-  if ! run_profile_ref "${profile}" "${right}" "commit:${right}"; then
+  set +e
+  run_profile_ref "${profile}" "${right}" "commit:${right}"
+  right_rc=$?
+  set -e
+  if [[ ${right_rc} -ne 0 && ${right_rc} -ne 2 ]]; then
     echo "Compare failed: could not benchmark right commit ${right} with profile ${profile}." >&2
     return 1
   fi
-  right_skipped=${LAST_RUN_SKIPPED}
 
-  if [[ ${left_skipped} -eq 1 || ${right_skipped} -eq 1 ]]; then
+  if [[ ${left_rc} -eq 2 || ${right_rc} -eq 2 ]]; then
     echo "Compare aborted: at least one commit run was skipped due to missing dependencies for profile ${profile}." >&2
     echo "Install missing dependencies or rerun with --strict to fail fast." >&2
-    return 3
+    return 2
   fi
 
   "${ROOT_DIR}/benchmark_tools/compare_commits.sh" "${left}" "${right}"
@@ -318,6 +412,7 @@ main() {
   local compare_left=""
   local compare_right=""
   local compare_profile=""
+  local run_status=0
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -336,6 +431,10 @@ main() {
         ;;
       --strict)
         STRICT_MODE=1
+        shift
+        ;;
+      --keep-going)
+        KEEP_GOING=1
         shift
         ;;
       -h|--help)
@@ -358,7 +457,10 @@ main() {
     if [[ -z "${compare_profile}" ]]; then
       compare_profile="$(jq -r '.compare_default_profile' "${CONFIG_FILE}")"
     fi
+    set +e
     run_compare_commits "${compare_left}" "${compare_right}" "${compare_profile}"
+    run_status=$?
+    set -e
   elif [[ -n "${branch_arg}" ]]; then
     local ref
     ref="$(jq -r --arg n "${branch_arg}" '.profiles[] | select(.name == $n) | .ref' "${CONFIG_FILE}")"
@@ -366,9 +468,18 @@ main() {
       echo "Unknown profile: ${branch_arg}" >&2
       exit 1
     fi
+    set +e
     run_profile_ref "${branch_arg}" "${ref}" "${branch_arg}"
+    run_status=$?
+    set -e
+    if [[ ${run_status} -eq 2 ]]; then
+      run_status=0
+    fi
   else
+    set +e
     run_all_profiles
+    run_status=$?
+    set -e
   fi
 
   python3 "${ROOT_DIR}/benchmark_tools/generate_report.py" \
@@ -377,6 +488,8 @@ main() {
 
   echo "History updated: ${HISTORY_FILE}"
   echo "Report updated:  ${REPORT_FILE}"
+
+  exit ${run_status}
 }
 
 main "$@"
