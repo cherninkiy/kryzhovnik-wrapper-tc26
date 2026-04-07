@@ -1,1 +1,6 @@
 build/
+benchmark_history.csv
+benchmark_report.md
+compare_*.md
+benchmark_tools/worktree_*
+benchmark_tools/raw_logs/

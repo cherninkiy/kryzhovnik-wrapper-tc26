@@ -8,6 +8,9 @@ set(CMAKE_C_STANDARD 99)
 
 set(KRYZHOVNIK_PARAMSET "medium" CACHE STRING "Select a kryzhovnik parameter set")
 set_property(CACHE KRYZHOVNIK_PARAMSET PROPERTY STRINGS "small" "medium" "large" "debug")
+set(KRYZHOVNIK_BENCH_ITERS "200" CACHE STRING "Iterations for dedicated benchmark_tool target")
+set(KRYZHOVNIK_BENCH_MLEN "32" CACHE STRING "Message length for dedicated benchmark_tool target")
+option(KRYZHOVNIK_BUILD_BENCHMARK_TOOL "Build dedicated benchmark tool target" ON)
 if(NOT KRYZHOVNIK_PARAMSET STREQUAL "small" AND
    NOT KRYZHOVNIK_PARAMSET STREQUAL "medium" AND
    NOT KRYZHOVNIK_PARAMSET STREQUAL "large" AND
@@ -107,3 +110,16 @@ target_include_directories(speed PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
 )
+
+if(KRYZHOVNIK_BUILD_BENCHMARK_TOOL)
+    add_executable(benchmark_tool benchmark_tools/benchmark_tool.c)
+    target_link_libraries(benchmark_tool PRIVATE kryzhovnik)
+    target_include_directories(benchmark_tool PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_BINARY_DIR}
+    )
+    target_compile_definitions(benchmark_tool PRIVATE
+        BENCH_ITERS=${KRYZHOVNIK_BENCH_ITERS}
+        BENCH_MLEN=${KRYZHOVNIK_BENCH_MLEN}
+    )
+endif()

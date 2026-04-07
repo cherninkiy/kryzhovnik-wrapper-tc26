@@ -1,0 +1,49 @@
+{
+  "profiles": [
+    {
+      "name": "pure-c-local",
+      "ref": "pure-c",
+      "configure": "cmake -S . -B build-bench -DKRYZHOVNIK_PARAMSET=medium",
+      "build": "cmake --build build-bench --target test_pqs -j",
+      "benchmark_binary": "build-bench/test_pqs",
+      "benchmark_args": "",
+      "requires": [],
+      "paramset": "medium",
+      "msg_len": "20"
+    },
+    {
+      "name": "stdc++-local",
+      "ref": "stdc++",
+      "configure": "cmake -S . -B build-bench -DCMAKE_CXX_STANDARD=17",
+      "build": "cmake --build build-bench --target test_pqs -j",
+      "benchmark_binary": "build-bench/test_pqs",
+      "benchmark_args": "",
+      "requires": ["ntl"],
+      "paramset": "medium",
+      "msg_len": "20"
+    },
+    {
+      "name": "pure-c-origin",
+      "ref": "origin/pure-c",
+      "configure": "cmake -S . -B build-bench -DKRYZHOVNIK_PARAMSET=medium",
+      "build": "cmake --build build-bench --target test_pqs -j",
+      "benchmark_binary": "build-bench/test_pqs",
+      "benchmark_args": "",
+      "requires": [],
+      "paramset": "medium",
+      "msg_len": "20"
+    },
+    {
+      "name": "stdc++-origin",
+      "ref": "origin/stdc++",
+      "configure": "cmake -S . -B build-bench -DCMAKE_CXX_STANDARD=17",
+      "build": "cmake --build build-bench --target test_pqs -j",
+      "benchmark_binary": "build-bench/test_pqs",
+      "benchmark_args": "",
+      "requires": ["ntl"],
+      "paramset": "medium",
+      "msg_len": "20"
+    }
+  ],
+  "compare_default_profile": "pure-c-local"
+}
