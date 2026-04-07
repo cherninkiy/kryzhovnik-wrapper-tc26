@@ -1,0 +1,31 @@
+# <type>(<scope>): <subject>
+# <subject> — short description (up to 50 chars, imperative mood)
+
+# <body> — details with bullet points (-), each line up to 72 chars
+
+# <footer> — references to issues, breaking changes
+
+
+# Examples for this project:
+# feat(wrapper): expose kryzhovnik_sign with explicit pk argument
+# - PQS_sign requires vk internally; pass pk bytes alongside sk
+# - Update kryzhovnik_wrapper.h and kryzhovnik_wrapper.c accordingly
+# - Adjust benchmark_tool.c and test_wrapper.c call sites
+#
+# fix(sign): replace stub implementations with real PQS routines
+# - Provide full bodies for sign.c, poly_mul.c, fips202.c
+# - Remove placeholder return values; wire up params.h constants
+#
+# perf(bench): increase default BENCH_ITERS to 500 for medium paramset
+# - More iterations reduce timing noise on slow runners
+# - Update KRYZHOVNIK_BENCH_ITERS default in CMakeLists.txt
+#
+# ci(benchmark): add fetch-depth:0 and explicit branch fetch step
+# - origin/pure-c and origin/stdc++ must exist before git worktree add
+# - Fixes "fatal: invalid reference" on fresh checkout runners
+#
+# chore(params): add debug paramset with reduced n for fast iteration
+# - Add paramsets/params_debug.h with PQS_n=64
+# - Register "debug" in CMakeLists.txt STRINGS property
+
+# Types: feat, fix, docs, style, refactor, test, chore, perf, ci, build

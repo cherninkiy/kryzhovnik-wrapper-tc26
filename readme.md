@@ -1,89 +1,110 @@
-# PQS
-DSA Postquantum standardization candidate reported here: https://crypto-kantiana.com/main_papers/main_Signature.pdf
+# kryzhovnik-wrapper-tc26 — service/benchmark-tooling
 
-# Requirements
-- gcc compiler >= 9.2.1
-- OpenSSL library development package
+This branch contains **benchmark automation tooling** for comparing performance
+across implementation branches of the PQS signature scheme wrapper.
 
-# Running instructions
-Clone the repository files to some folder, e.g. `~/PQS`, then execute the following commands to compile the project:
-```sh
-cd ~/PQS/Signature/
+The underlying PQS signature algorithm is described in  
+https://crypto-kantiana.com/main_papers/main_Signature.pdf  
+Original reference implementation: https://github.com/ElenaKirshanova/pqc_LWR_signature  
+(authors: ElenaKirshanova, summerschool-kld, kn02262, n7v)
+
+---
+
+## Branches compared
+
+| Profile | Branch | Toolchain |
+|---------|--------|-----------|
+| `pure-c-local` / `pure-c-origin` | `pure-c` | gcc, C99 |
+| `stdc++-local` / `stdc++-origin` | `stdc++` | g++, C++17, NTL |
+
+---
+
+## Requirements
+
+```
+cmake >= 3.10
 make
+gcc / g++
+jq
+python3
 ```
 
-Run PQS testing script
-```sh
-./pqs_test
+For `stdc++` profiles additionally:
 ```
-All the desired parameters for testing script as well as the signature parameters itself can be adjusted in header files `config.h`, `params.h`.
-
-# Usage as an external library
-
-In order to use this implementation in external project, include `sign.h` header file into your project and follow the instructions below.
-```sh
-#include "~/PQS/Signature/sign.h"
+g++
+libntl-dev  (NTL library with <NTL/ZZ_pEX.h>)
 ```
 
-1. Allocate memory for public key, private key and signature by declaring variables having special data types `vk_t`, `sk_t`, `signat_t` respectively;
-2. Generate a keypair by calling
-```sh
-PQS_keygen(vk, sk);
-```
-3. Load the message to be signed to array `unsigned char m[]` of length `int mlen` bytes
-4. Sign the message by calling
-```sh
-PQS_sign(sig, &m[0], sizeof(m), sk, vk);
-```
-5. Verify the signature stored in `sig` by calling a verification procedure
-```sh
-bool success = PQS_verify(sig, &m[0], sizeof(m), vk);
-```
-
-Please refer to the following paper for more details: https://crypto-kantiana.com/main_papers/main_Signature.pdf
-
-# Benchmark tooling
-
-Repository includes benchmark automation in `benchmark_tools/` for branch and commit comparison.
+---
 
 ## Quick start
 
-Run both configured profiles:
+Run all profiles defined in `benchmark_tools/config.json`:
 ```sh
 ./benchmark_tools/run_benchmark.sh
 ```
 
-Run one profile:
+Run a single profile:
 ```sh
-./benchmark_tools/run_benchmark.sh --branch pure-c-local
+./benchmark_tools/run_benchmark.sh --branch pure-c-origin
+./benchmark_tools/run_benchmark.sh --branch stdc++-origin
 ```
 
-Compare two commits inside one profile:
-```sh
-./benchmark_tools/run_benchmark.sh --compare-commits <commit1> <commit2> --profile pure-c-local
-```
-
-Enable strict dependency mode:
+Strict mode — abort instead of skipping if a required dependency (e.g. NTL) is missing:
 ```sh
 ./benchmark_tools/run_benchmark.sh --strict --branch stdc++-origin
 ```
 
+Compare two commits within a profile:
+```sh
+./benchmark_tools/run_benchmark.sh \
+  --compare-commits <commit1> <commit2> \
+  --profile pure-c-local
+```
+
+---
+
 ## Profiles
 
-Defined in `benchmark_tools/config.json`:
-- `pure-c-local` uses local branch `pure-c`
-- `stdc++-local` uses local branch `stdc++`
-- `pure-c-origin` uses `origin/pure-c`
-- `stdc++-origin` uses `origin/stdc++`
+Profiles are defined in `benchmark_tools/config.json`.
+
+- **`pure-c-local`** — local branch `pure-c`, cmake medium paramset  
+- **`stdc++-local`** — local branch `stdc++`, cmake C++17, requires NTL  
+- **`pure-c-origin`** — `origin/pure-c`, same as pure-c-local but resolved from remote  
+- **`stdc++-origin`** — `origin/stdc++`, same as stdc++-local but resolved from remote  
+
+Each run uses `git worktree` to check out the target ref in isolation without
+touching the working tree.
+
+---
 
 ## Artifacts
 
-- `benchmark_history.csv`: append-only history
-- `benchmark_report.md`: generated markdown report
-- `benchmark_tools/raw_logs/`: raw benchmark output per run
+| File / Path | Description |
+|---|---|
+| `benchmark_history.csv` | Append-only timing history across all runs |
+| `benchmark_report.md` | Generated Markdown report from CSV |
+| `benchmark_tools/raw_logs/` | Raw binary output per individual run |
 
-## Compare exit codes
+---
 
-- `0`: success
-- `1`: generic run/build/parse error
-- `3`: compare aborted because at least one run was skipped due to missing dependencies
+## Exit codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Success |
+| `1` | Build, run, or parse error |
+| `3` | Compare aborted: at least one run skipped due to missing dependency |
+
+---
+
+## CI
+
+GitHub Actions workflow: `.github/workflows/benchmark-tooling.yml`
+
+Jobs:
+- **`pure-c-origin-smoke`** — runs `pure-c-origin` profile, uploads artifacts  
+- **`stdcpp-origin-strict`** — runs `stdc++-origin` in strict mode  
+
+Both jobs fetch `pure-c` and `stdc++` branches explicitly before running,
+since `actions/checkout` does not fetch non-default branches by default.
