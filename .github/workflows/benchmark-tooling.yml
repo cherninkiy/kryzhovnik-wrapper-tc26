@@ -7,7 +7,7 @@ on:
       - '.github/workflows/benchmark-tooling.yml'
       - 'benchmark_tools/**'
       - 'pure-c/**'
-      - 'stdc++/**'
+      - 'stdc\+\+/**'
       - 'CMakeLists.txt'
       - '*.yml'
 
