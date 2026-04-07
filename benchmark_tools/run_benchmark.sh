@@ -11,6 +11,7 @@ STRICT_MODE=0
 KEEP_GOING=0
 CURRENT_WT_DIR=""
 BENCH_BUILD_CACHE_DIR="${BENCH_BUILD_CACHE_DIR:-}"
+ALLOW_LEGACY_PARSE="${ALLOW_LEGACY_PARSE:-0}"
 
 mkdir -p "${RAW_DIR}"
 
@@ -167,6 +168,7 @@ check_requirements() {
 
 parse_result_line() {
   local raw_file="$1"
+  local cfg_json="$2"
 
   local result_line
   result_line="$(grep '^RESULT ' "${raw_file}" | tail -n 1 || true)"
@@ -175,8 +177,55 @@ parse_result_line() {
     return 0
   fi
 
-  echo "Missing structured RESULT line in benchmark output: ${raw_file}" >&2
-  return 1
+  if [[ "${ALLOW_LEGACY_PARSE}" != "1" ]]; then
+    echo "Missing structured RESULT line in benchmark output: ${raw_file}" >&2
+    return 1
+  fi
+
+  python3 - "${raw_file}" "${cfg_json}" <<'PY'
+import json
+import re
+import statistics
+import sys
+from pathlib import Path
+
+raw_file = Path(sys.argv[1])
+cfg = json.loads(sys.argv[2])
+text = raw_file.read_text(encoding="utf-8", errors="replace")
+
+kg = [float(v) for v in re.findall(r"Keypair is generated in\s+([0-9.]+)\s+sec", text)]
+sg = [float(v) for v in re.findall(r"Signing is completed in\s+([0-9.]+)\s+sec", text)]
+vf = [float(v) for v in re.findall(r"Verification is completed in\s+([0-9.]+)\s+sec", text)]
+
+if not kg or not sg or not vf:
+    sys.exit(2)
+
+iters = min(len(kg), len(sg), len(vf))
+kg = kg[:iters]
+sg = sg[:iters]
+vf = vf[:iters]
+
+kg_med_us = statistics.median(kg) * 1_000_000.0
+kg_avg_us = statistics.mean(kg) * 1_000_000.0
+sg_med_us = statistics.median(sg) * 1_000_000.0
+sg_avg_us = statistics.mean(sg) * 1_000_000.0
+vf_med_us = statistics.median(vf) * 1_000_000.0
+vf_avg_us = statistics.mean(vf) * 1_000_000.0
+ops = 1_000_000.0 / sg_avg_us if sg_avg_us > 0 else 0.0
+
+paramset = cfg.get("paramset", "unknown")
+msg_len = cfg.get("msg_len", "unknown")
+
+print(
+    "RESULT "
+    f"benchmark=legacy_test_pqs paramset={paramset} iters={iters} msg_len={msg_len} "
+    f"keygen_med_us={kg_med_us:.3f} keygen_avg_us={kg_avg_us:.3f} "
+    f"sign_med_us={sg_med_us:.3f} sign_avg_us={sg_avg_us:.3f} "
+    f"verify_med_us={vf_med_us:.3f} verify_avg_us={vf_avg_us:.3f} "
+    f"sign_ops_s={ops:.6f}"
+)
+PY
+  return $?
 }
 
 run_profile_ref() {
@@ -270,9 +319,12 @@ run_profile_ref() {
 
   cleanup_worktree
 
-  local result_line
-  result_line="$(parse_result_line "${raw_file}")"
-  if [[ -z "${result_line}" ]]; then
+  local result_line parse_status
+  set +e
+  result_line="$(parse_result_line "${raw_file}" "${cfg}")"
+  parse_status=$?
+  set -e
+  if [[ ${parse_status} -ne 0 || -z "${result_line}" ]]; then
     echo "Cannot parse benchmark output for profile ${profile_name}." >&2
     return 1
   fi

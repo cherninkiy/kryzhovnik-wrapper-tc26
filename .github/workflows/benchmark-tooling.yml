@@ -45,11 +45,9 @@ jobs:
           git fetch --no-tags origin pure-c stdc++
 
       - name: Cache apt packages
-        uses: awalsh128/cache-apt-pkgs-action@latest
+        uses: awalsh128/cache-apt-pkgs-action@v1.4.3
         with:
-          packages: >-
-            cmake make jq python3 python3-pip gcc-12 g++-12
-            ${{ matrix.needs_ntl && 'libntl-dev' || '' }}
+          packages: cmake make jq python3 python3-pip gcc-12 g++-12 libntl-dev
           version: 2
 
       - name: Install pinned dependencies
@@ -57,10 +55,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            cmake make jq python3 python3-pip gcc-12 g++-12
-          if [[ "${{ matrix.needs_ntl }}" == "true" ]]; then
-            sudo apt-get install -y --no-install-recommends libntl-dev
-          fi
+            cmake make jq python3 python3-pip gcc-12 g++-12 libntl-dev
 
       - name: Cache build-bench
         uses: actions/cache@v4
@@ -75,6 +70,7 @@ jobs:
           CC: gcc-12
           CXX: g++-12
           BENCH_BUILD_CACHE_DIR: ${{ github.workspace }}/.bench-cache
+          ALLOW_LEGACY_PARSE: "1"
         run: |
           if [[ "${{ matrix.strict }}" == "true" ]]; then
             ./benchmark_tools/run_benchmark.sh --strict --branch ${{ matrix.profile }}
@@ -128,13 +124,14 @@ jobs:
       - name: Install smoke dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends cmake make jq python3 gcc-12 g++-12
+          sudo apt-get install -y --no-install-recommends cmake make jq python3 gcc-12 g++-12 libntl-dev
 
       - name: Run restricted smoke profile
         env:
           CC: gcc-12
           CXX: g++-12
           BENCH_BUILD_CACHE_DIR: ${{ github.workspace }}/.bench-cache
+          ALLOW_LEGACY_PARSE: "1"
         run: |
           ./benchmark_tools/run_benchmark.sh --branch pure-c-origin
 
