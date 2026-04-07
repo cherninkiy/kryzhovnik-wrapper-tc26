@@ -40,6 +40,24 @@ Profiles are defined in [benchmark_tools/config.json](benchmark_tools/config.jso
 
 Note: `large` is a very resource-intensive paramset and is excluded from standard benchmark scenarios.
 
+## 🧰 Prerequisites
+
+Ubuntu/Debian:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y --no-install-recommends \
+	git jq cmake make python3 gcc-12 g++-12 libntl-dev
+```
+
+macOS (Homebrew baseline):
+
+```bash
+brew install git jq cmake python
+```
+
+For `stdc++-*` profiles you also need NTL headers/libraries available to the toolchain.
+
 ## 🛣️ Optimization Roadmap (Future Branches)
 
 The current focus is benchmarking and reproducibility. For performance-oriented
@@ -76,8 +94,20 @@ Acceptance policy for each branch:
 ./benchmark_tools/run_benchmark.sh
 ./benchmark_tools/run_benchmark.sh --branch pure-c-origin
 ./benchmark_tools/run_benchmark.sh --branch stdc++-origin
+./benchmark_tools/run_benchmark.sh --keep-going
+./benchmark_tools/run_benchmark.sh --strict --branch stdc++-origin
 ./benchmark_tools/run_benchmark.sh --compare-commits <commit1> <commit2> --profile pure-c-local
+python3 ./benchmark_tools/compare_commits.py <commit1> <commit2> --profile pure-c-origin
 ```
+
+Flags:
+- `--strict`: fail fast when a profile has missing dependencies or is otherwise non-runnable.
+- `--keep-going`: continue running remaining profiles even if one profile fails; script exits non-zero at the end if any profile failed.
+- `--compare-commits`: benchmark two commits with selected profile and generate comparison markdown.
+
+`large` profile notes:
+- Standard benchmark flow intentionally skips `paramset=large` in automation.
+- To run it manually, add/edit a profile in [benchmark_tools/config.json](benchmark_tools/config.json) with `"paramset": "large"` and invoke `--branch <that-profile>` in a dedicated environment.
 
 ## 📊 Latest Snapshot
 
@@ -94,6 +124,36 @@ Artifacts:
 - [benchmark_history.csv](benchmark_history.csv)
 - [benchmark_report.md](benchmark_report.md)
 - [benchmark_tools/raw_logs](benchmark_tools/raw_logs)
+
+CSV schema (`benchmark_history.csv`):
+
+| Column | Meaning | Unit |
+|---|---|---|
+| `timestamp` | benchmark timestamp (UTC) | ISO-8601 |
+| `profile` | profile name from config | text |
+| `branch` | branch/ref label used for run | text |
+| `commit` | short commit hash benchmarked | text |
+| `paramset` | selected parameter set | text |
+| `iters` | iteration count reported by benchmark binary | count |
+| `msg_len` | message length used in benchmark | bytes |
+| `keygen_med_us` | median key generation time | microseconds |
+| `keygen_avg_us` | mean key generation time | microseconds |
+| `sign_med_us` | median signing time | microseconds |
+| `sign_avg_us` | mean signing time | microseconds |
+| `verify_med_us` | median verification time | microseconds |
+| `verify_avg_us` | mean verification time | microseconds |
+| `sign_ops_s` | signing throughput derived from average | ops/sec |
+| `raw_log` | path to raw benchmark log | relative path |
+
+Interpretation notes:
+- `*_med_us` is robust to outliers and preferred for commit-to-commit comparisons.
+- `*_avg_us` and `sign_ops_s` are useful for throughput trends and CI drift monitoring.
+- Benchmark binary output must include a structured `RESULT ...` line for ingestion.
+
+CI policy summary:
+- Trusted PRs (same repository): full matrix benchmark pipeline.
+- Fork PRs: restricted smoke benchmark path.
+- Workflow uses path filtering to avoid heavy runs for unrelated changes.
 
 ## 🙏 Acknowledgments
 
