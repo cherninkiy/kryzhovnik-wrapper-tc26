@@ -177,6 +177,17 @@ run_profile_ref() {
   bench_binary="$(jq -r '.benchmark_binary' <<<"${cfg}")"
   bench_args="$(jq -r '.benchmark_args // ""' <<<"${cfg}")"
 
+  local declared_paramset
+  declared_paramset="$(jq -r '.paramset // ""' <<<"${cfg}")"
+  if [[ "${declared_paramset}" == "large" ]] || grep -Eq -- '-DKRYZHOVNIK_PARAMSET=large\b' <<<"${configure_cmd}"; then
+    echo "Profile ${profile_name}: paramset 'large' is intentionally excluded from standard benchmark scenarios because it is very resource-intensive on CI/dev VMs." >&2
+    if [[ ${STRICT_MODE} -eq 1 ]]; then
+      return 1
+    fi
+    LAST_RUN_SKIPPED=1
+    return 0
+  fi
+
   if ! check_requirements "${profile_name}" "${cfg}"; then
     if [[ ${STRICT_MODE} -eq 1 ]]; then
       echo "Profile ${profile_name} (${ref}): strict mode enabled, stopping due to missing dependencies." >&2

@@ -1,4 +1,4 @@
-build/
+build*/
 benchmark_history.csv
 benchmark_report.md
 compare_*.md
