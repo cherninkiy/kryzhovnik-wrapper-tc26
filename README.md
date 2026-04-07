@@ -115,10 +115,10 @@ Source: [benchmark_history.csv](benchmark_history.csv)
 
 | Profile | Timestamp (UTC) | Commit | Paramset | Sign med us | Sign avg us | Sign ops/s |
 |---|---|---|---|---:|---:|---:|
-| pure-c-origin | 2026-04-07T09:36:04Z | 9b900c0 | medium | 16934.500 | 24912.327 | 40.140770 |
-| stdc++-origin | n/a | n/a | n/a | n/a | n/a | n/a |
-| pure-c-local | 2026-04-07T08:56:22Z | 9b900c0 | medium | 16849.500 | 25258.568 | 39.590526 |
-| stdc++-local | n/a | n/a | n/a | n/a | n/a | n/a |
+| pure-c-origin | 2026-04-07T19:06:07Z | 9b900c0 | medium | 16008.000 | 23421.898 | 42.695088 |
+| stdc++-origin | 2026-04-07T19:06:11Z | 7ac29e4 | medium | 94644.000 | 93750.400 | 10.666621 |
+| pure-c-local | 2026-04-07T19:05:35Z | 9b900c0 | medium | 16000.000 | 22006.661 | 45.440787 |
+| stdc++-local | 2026-04-07T19:05:40Z | 7ac29e4 | medium | 49626.500 | 59654.600 | 16.763167 |
 
 Artifacts:
 - [benchmark_history.csv](benchmark_history.csv)
