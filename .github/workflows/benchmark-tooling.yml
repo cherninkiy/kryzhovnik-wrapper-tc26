@@ -1,0 +1,45 @@
+name: benchmark-tooling
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  pure-c-local-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake make jq python3
+
+      - name: Run pure-c local profile
+        run: |
+          ./benchmark_tools/run_benchmark.sh --branch pure-c-local
+
+      - name: Upload benchmark artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pure-c-benchmark-artifacts
+          path: |
+            benchmark_history.csv
+            benchmark_report.md
+            benchmark_tools/raw_logs/
+
+  stdcpp-origin-strict:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake make jq python3 g++ libntl-dev
+
+      - name: Run stdc++ origin profile in strict mode
+        run: |
+          ./benchmark_tools/run_benchmark.sh --strict --branch stdc++-origin

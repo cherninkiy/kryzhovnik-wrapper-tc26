@@ -41,3 +41,49 @@ bool success = PQS_verify(sig, &m[0], sizeof(m), vk);
 ```
 
 Please refer to the following paper for more details: https://crypto-kantiana.com/main_papers/main_Signature.pdf
+
+# Benchmark tooling
+
+Repository includes benchmark automation in `benchmark_tools/` for branch and commit comparison.
+
+## Quick start
+
+Run both configured profiles:
+```sh
+./benchmark_tools/run_benchmark.sh
+```
+
+Run one profile:
+```sh
+./benchmark_tools/run_benchmark.sh --branch pure-c-local
+```
+
+Compare two commits inside one profile:
+```sh
+./benchmark_tools/run_benchmark.sh --compare-commits <commit1> <commit2> --profile pure-c-local
+```
+
+Enable strict dependency mode:
+```sh
+./benchmark_tools/run_benchmark.sh --strict --branch stdc++-origin
+```
+
+## Profiles
+
+Defined in `benchmark_tools/config.json`:
+- `pure-c-local` uses local branch `pure-c`
+- `stdc++-local` uses local branch `stdc++`
+- `pure-c-origin` uses `origin/pure-c`
+- `stdc++-origin` uses `origin/stdc++`
+
+## Artifacts
+
+- `benchmark_history.csv`: append-only history
+- `benchmark_report.md`: generated markdown report
+- `benchmark_tools/raw_logs/`: raw benchmark output per run
+
+## Compare exit codes
+
+- `0`: success
+- `1`: generic run/build/parse error
+- `3`: compare aborted because at least one run was skipped due to missing dependencies
