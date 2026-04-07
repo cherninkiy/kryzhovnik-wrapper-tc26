@@ -4,17 +4,23 @@ on:
   workflow_dispatch:
   pull_request:
 
+concurrency:
+  group: benchmark-tooling-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   pure-c-origin-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install dependencies
+        timeout-minutes: 8
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake make jq python3
+          sudo apt-get install -y --no-install-recommends cmake make jq python3
 
       - name: Run pure-c origin profile
         run: |
@@ -31,14 +37,16 @@ jobs:
 
   stdcpp-origin-strict:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install dependencies
+        timeout-minutes: 12
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake make jq python3 g++ libntl-dev
+          sudo apt-get install -y --no-install-recommends cmake make jq python3 g++ libntl-dev
 
       - name: Run stdc++ origin profile in strict mode
         run: |
