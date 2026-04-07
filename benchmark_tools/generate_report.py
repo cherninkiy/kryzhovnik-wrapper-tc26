@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import argparse
 import csv
+import json
+import re
 from collections import defaultdict
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -41,6 +43,54 @@ def latest_by_profile(rows):
     return out
 
 
+def load_config(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def infer_dynamic_pairs(profile_names: list[str]) -> list[tuple[str, str, str]]:
+    grouped: dict[str, list[str]] = defaultdict(list)
+    for name in profile_names:
+        m = re.match(r"^(.*)-(local|origin)$", name)
+        if not m:
+            continue
+        grouped[m.group(2)].append(name)
+
+    pairs: list[tuple[str, str, str]] = []
+    for suffix, names in grouped.items():
+        names.sort()
+        baseline = f"pure-c-{suffix}" if f"pure-c-{suffix}" in names else names[0]
+        for candidate in names:
+            if candidate == baseline:
+                continue
+            label = f"{suffix}: {baseline} vs {candidate}"
+            pairs.append((baseline, candidate, label))
+    return pairs
+
+
+def build_comparisons(latest: dict[str, dict[str, str]], config: dict) -> list[tuple[str, str, str]]:
+    pairs: list[tuple[str, str, str]] = []
+    explicit = config.get("comparison_pairs", []) if isinstance(config, dict) else []
+
+    for item in explicit:
+        if not isinstance(item, dict):
+            continue
+        base = item.get("base", "").strip()
+        contender = item.get("contender", "").strip()
+        label = item.get("label", f"{base} vs {contender}").strip()
+        if base and contender:
+            pairs.append((base, contender, label))
+
+    if pairs:
+        return pairs
+
+    return infer_dynamic_pairs(list(latest.keys()))
+
+
 def last_two_by_profile(rows):
     groups = defaultdict(list)
     for r in rows:
@@ -52,8 +102,8 @@ def last_two_by_profile(rows):
     return out
 
 
-def build_report(rows):
-    now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
+def build_report(rows, config):
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     lines = [
         "# Kryzhovnik Benchmark Report",
         "",
@@ -88,25 +138,24 @@ def build_report(rows):
             )
         )
 
-    comparisons = [
-        ("pure-c-local", "stdc++-local", "local"),
-        ("pure-c-origin", "stdc++-origin", "origin"),
-    ]
-    for pure_name, std_name, label in comparisons:
-        if pure_name in latest and std_name in latest:
-            p = latest[pure_name]
-            s = latest[std_name]
+    comparisons = build_comparisons(latest, config)
+    for base_name, contender_name, label in comparisons:
+        if base_name in latest and contender_name in latest:
+            p = latest[base_name]
+            s = latest[contender_name]
             lines.extend([
                 "",
-                f"## pure-c vs stdc++ ({label})",
+                f"## Profile Comparison ({label})",
                 "",
             ])
             sign_speedup = to_float(s["sign_avg_us"]) / max(to_float(p["sign_avg_us"]), 1e-9)
             keygen_speedup = to_float(s["keygen_avg_us"]) / max(to_float(p["keygen_avg_us"]), 1e-9)
             verify_speedup = to_float(s["verify_avg_us"]) / max(to_float(p["verify_avg_us"]), 1e-9)
-            lines.append(f"- Sign speedup (pure-c faster if >1): {sign_speedup:.3f}x")
-            lines.append(f"- KeyGen speedup (pure-c faster if >1): {keygen_speedup:.3f}x")
-            lines.append(f"- Verify speedup (pure-c faster if >1): {verify_speedup:.3f}x")
+            lines.append(f"- Base profile: {base_name}")
+            lines.append(f"- Contender profile: {contender_name}")
+            lines.append(f"- Sign speedup (base faster if >1): {sign_speedup:.3f}x")
+            lines.append(f"- KeyGen speedup (base faster if >1): {keygen_speedup:.3f}x")
+            lines.append(f"- Verify speedup (base faster if >1): {verify_speedup:.3f}x")
 
     lines.extend(["", "## Recent History (last 5 per profile)", ""])
     history = last_two_by_profile(rows)
@@ -137,13 +186,15 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--history", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--config", required=False, default="")
     args = parser.parse_args()
 
     history = Path(args.history)
     output = Path(args.output)
+    config = Path(args.config) if args.config else (Path(__file__).resolve().parent / "config.json")
 
     rows = read_rows(history)
-    report = build_report(rows)
+    report = build_report(rows, load_config(config))
     output.write_text(report, encoding="utf-8")
 
 
